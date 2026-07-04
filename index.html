@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,700;0,800;0,900;1,800&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!-- QR Kod Okuyucu Kütüphanesi -->
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <style>
 :root{
@@ -294,7 +295,7 @@ h1,h2,h3,.disp{font-family:var(--disp); text-transform:uppercase; letter-spacing
 
 <script type="module">
 /* ============================================================
-   APEX GYM — v3.1 (TAM VE EKSİKSİZ KOD)
+   APEX GYM — v3.1 (TAM VE EKSİKSİZ KOD + NORMALİZASYON)
    ============================================================ */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
 import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
@@ -335,18 +336,49 @@ const ICONS = {
 };
 function icon(name, cls){ return `<span class="${cls||''}" style="display:inline-flex">${ICONS[name]||''}</span>`; }
 
-/* ---------- DATA ---------- */
+/* ---------- DATA NORMALIZATION (Firebase Koruma Sistemi) ---------- */
+// Firebase içi boş olan dizileri sildiği için sayfalar çöküyordu, bu fonksiyon bunu tamamen çözer.
+function toArray(obj) {
+    if (!obj) return [];
+    if (Array.isArray(obj)) return obj;
+    return Object.values(obj);
+}
+
 const DEFAULT_DATA = { accounts:[{id:'main', username:'baydogan', password:'0306', main:true}], students:[], expenses:[], collections:[], vitaminBar:[] };
 let DATA = JSON.parse(JSON.stringify(DEFAULT_DATA));
 let saveTimer = null;
+
+function normalizeData() {
+    DATA.accounts = toArray(DATA.accounts);
+    DATA.students = toArray(DATA.students);
+    DATA.expenses = toArray(DATA.expenses);
+    DATA.collections = toArray(DATA.collections);
+    DATA.vitaminBar = toArray(DATA.vitaminBar);
+
+    DATA.students.forEach(s => {
+        s.payments = toArray(s.payments);
+        s.freezeHistory = toArray(s.freezeHistory);
+        s.freezeRequests = toArray(s.freezeRequests);
+        s.program = s.program || {};
+        s.program.assigned = s.program.assigned || {};
+        s.program.assigned.list = toArray(s.program.assigned.list);
+        s.program.assigned.days = s.program.assigned.days || {};
+        s.program.own = s.program.own || {};
+        s.program.own.list = toArray(s.program.own.list);
+        s.program.own.days = s.program.own.days || {};
+    });
+}
 
 async function loadData(){
   try {
     const snapshot = await get(dbRef);
     if (snapshot.exists()) DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), snapshot.val());
   } catch(e) { console.error('Veri yükleme hatası:', e); }
+  normalizeData(); // Veri çekildikten sonra eksik listeleri zorla oluşturur
 }
+
 function saveData(){
+  normalizeData(); // Veri kaydedilmeden önce de kontrol eder
   clearTimeout(saveTimer);
   saveTimer = setTimeout(()=> set(dbRef, DATA).catch(e => console.error('Kaydetme hatası:', e)), 250);
 }
@@ -499,7 +531,7 @@ function renderLogin(){
 }
 
 function logout(){
-  stopScanner(); // Kamerayı tamamen kapatır
+  stopScanner(); 
   STATE = {role:null, loginMode:null, bizScreen:'overview', athScreen:'overview', currentStudentId:null, currentAccount:null, freezeTab:'list', studentSearch:'', freezeSearch:''};
   render();
 }
@@ -1004,10 +1036,13 @@ function openProgramEditor(studentId, which, onDone){
             ${DAYS.map(d=>`<option>${d}</option>`).join('')}
           </select>
 
+          <!-- BÖLGE SEÇİMİ (PILLS) -->
           <div class="region-pills" id="pe-region-pills"></div>
           
+          <!-- HAREKET SEÇİMİ (GRID) -->
           <div class="ex-grid" id="pe-ex-grid"></div>
 
+          <!-- DETAYLAR VE EKLEME -->
           <div id="pe-details" style="display:none; margin-top:20px; padding-top:20px; border-top:1px solid var(--border);">
             <div class="row2">
               <div class="field"><label>Set</label><input type="number" id="pe-sets" value="4"></div>
@@ -1208,7 +1243,8 @@ function athScan(page, s){
        <div id="qr-reader" style="width:100%; max-width:400px; border-radius:16px; overflow:hidden; border:2px solid var(--border); box-shadow:0 10px 30px rgba(0,0,0,.5);"></div>
        
        <div id="scan-result" style="margin-top:24px; font-family:var(--disp); font-size:24px; min-height:30px;">
-          </div>
+          <!-- Sonuç Mesajı Buraya Gelecek -->
+       </div>
        
        <div style="margin-top:20px; font-size:14px; color:var(--muted); background:var(--bg3); padding:12px 20px; border-radius:100px;">
           Mevcut Durumunuz: <strong style="color:${s.checkedIn ? 'var(--green)' : 'var(--white)'};">${s.checkedIn ? 'Salondasınız (Giriş Yapıldı)' : 'Salonda Değilsiniz'}</strong>
