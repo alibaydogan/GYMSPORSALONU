@@ -43,7 +43,7 @@ h1,h2,h3,.disp{font-family:var(--disp); letter-spacing:.5px;}
 
 .hairline{height:1px; background:linear-gradient(90deg, var(--red) 0%, transparent 70%); width:100%; opacity:.6;}
 
-/* ---------- WATERMARK BACKGROUND ICONS (original vector line-art, not photos) ---------- */
+/* ---------- WATERMARK BACKGROUND ICONS ---------- */
 .bg-wm{position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:0;}
 .bg-wm svg{position:absolute; opacity:.05; stroke:var(--red); fill:none;}
 
@@ -266,12 +266,30 @@ h1,h2,h3,.disp{font-family:var(--disp); letter-spacing:.5px;}
 
 <div id="root"></div>
 
-<script>
+<!-- BURADA ARTIK TYPE="MODULE" KULLANILIYOR -->
+<script type="module">
 /* ============================================================
-   APEX GYM — tek dosya SPA (vanilla JS) + window.storage
+   APEX GYM — tek dosya SPA (vanilla JS) + Firebase (v12)
    ============================================================ */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import { getDatabase, ref, get, set } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
 
-const STORAGE_KEY = 'apexgym_data_v1';
+// SENİN FIREBASE AYARLARIN
+const firebaseConfig = {
+  apiKey: "AIzaSyAHDMn4NQUnU9W8Y9KDO7cF-k7vnTl9Mqc",
+  authDomain: "gym-sayfa.firebaseapp.com",
+  databaseURL: "https://gym-sayfa-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "gym-sayfa",
+  storageBucket: "gym-sayfa.firebasestorage.app",
+  messagingSenderId: "76346687326",
+  appId: "1:76346687326:web:12aa35f7587497282b99cf",
+  measurementId: "G-B28DJPXKS5"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const dbRef = ref(db, 'apexgym_data');
+
 const root = document.getElementById('root');
 
 /* ---------- ICONS (inline SVG, stroke=currentColor) ---------- */
@@ -294,7 +312,7 @@ const ICONS = {
 };
 function icon(name, cls){ return `<span class="${cls||''}" style="display:inline-flex">${ICONS[name]||''}</span>`; }
 
-/* ---------- ORIGINAL VECTOR "PHOTOS" (fitness silhouettes, line art, not real photos) ---------- */
+/* ---------- ORIGINAL VECTOR "PHOTOS" ---------- */
 const ART = {
   lifter:`<svg viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice">
     <rect width="400" height="260" fill="#111114"/>
@@ -350,20 +368,24 @@ const DEFAULT_DATA = {
 let DATA = JSON.parse(JSON.stringify(DEFAULT_DATA));
 let saveTimer = null;
 
+// Firebase'den Veri Çekme
 async function loadData(){
-  try{
-    const res = await window.storage.get('data', true);
-    if(res && res.value){
-      const parsed = JSON.parse(res.value);
-      DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), parsed);
+  try {
+    const snapshot = await get(dbRef);
+    if (snapshot.exists()) {
+      const dbData = snapshot.val();
+      DATA = Object.assign(JSON.parse(JSON.stringify(DEFAULT_DATA)), dbData);
     }
-  }catch(e){ /* no data yet */ }
+  } catch(e) {
+    console.error('Veri yükleme hatası:', e);
+  }
 }
+
+// Firebase'e Veri Kaydetme
 function saveData(){
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(async ()=>{
-    try{ await window.storage.set('data', JSON.stringify(DATA), true); }
-    catch(e){ console.error('Kaydetme hatası', e); }
+  saveTimer = setTimeout(()=>{
+    set(dbRef, DATA).catch(e => console.error('Kaydetme hatası:', e));
   }, 250);
 }
 
